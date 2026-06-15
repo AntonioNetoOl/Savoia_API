@@ -31,7 +31,7 @@ Armazenar a base importada da planilha atual de sócios.
 - preservar o número atual de sócio;
 - armazenar dados de identificação vindos da planilha;
 - permitir busca por dados únicos, principalmente CPF;
-- apoiar o vínculo automático ou semi-automático entre usuário do app e sócio legado;
+- apoiar o vínculo automático entre usuário do app e sócio legado;
 - manter rastreabilidade da origem dos dados.
 
 ### Campos iniciais sugeridos
@@ -56,6 +56,7 @@ updated_at
 ### Observações
 
 - `cpf` deve ser tratado como dado sensível.
+- O CPF já é obrigatório no cadastro atual do app.
 - A aplicação deve evitar expor CPF completo no frontend.
 - Recomenda-se armazenar CPF normalizado, e futuramente avaliar criptografia/hash dependendo da estratégia de segurança.
 - `numero_socio_legado` deve ser preservado para emissão da futura carteirinha.
@@ -66,7 +67,7 @@ updated_at
 
 ### Decisão
 
-Quando um usuário novo se cadastrar no app, o sistema deverá verificar se ele já existe na tabela `socios_legado`.
+Quando um usuário novo se cadastrar no app, o sistema deverá verificar automaticamente se ele já existe na tabela `socios_legado`.
 
 A verificação inicial será por dados únicos, com prioridade para:
 
@@ -82,10 +83,18 @@ telefone
 nome
 ```
 
+### Vínculo automático
+
+Se o CPF do usuário bater com um CPF em `socios_legado`, o vínculo será automático.
+
+Não haverá etapa manual obrigatória da sede antes de criar o vínculo inicial.
+
+A sede/backoffice entrará depois para atualizar dados operacionais, plano, fidelidade inicial e situação do sócio quando necessário.
+
 ### Fluxo esperado
 
 1. Usuário cria conta no app.
-2. Usuário informa CPF em etapa futura do cadastro/perfil.
+2. CPF já é coletado no cadastro obrigatório.
 3. Backend normaliza o CPF.
 4. Sistema busca CPF em `socios_legado`.
 5. Se encontrar, cria ou atualiza registro em `socios` com:
@@ -98,7 +107,7 @@ id_socio_legado = socios_legado.id_socio_legado
 ```
 
 6. App exibe o usuário como `socio_inativo`.
-7. Sede/backoffice valida e atualiza dados necessários, incluindo fidelidade inicial quando aplicável.
+7. Sede/backoffice pode atualizar dados necessários, incluindo fidelidade inicial quando aplicável.
 
 ---
 
@@ -236,13 +245,53 @@ quem pode reativar?
 
 ---
 
-## 9. Decisões consolidadas
+## 9. Planilha legada
+
+### Decisão atual
+
+O layout real da planilha ainda não foi recebido.
+
+O responsável pela base foi acionado e o envio está pendente.
+
+A expectativa é que a planilha contenha dados semelhantes aos já coletados no cadastro do app.
+
+### Implicação técnica
+
+A modelagem deve continuar flexível até o recebimento da planilha.
+
+Campos mínimos esperados:
+
+```txt
+numero_socio_legado
+nome
+cpf
+email
+telefone
+```
+
+Após receber a planilha, será necessário revisar:
+
+```txt
+nomes das colunas
+tipos de dados
+campos obrigatórios
+qualidade dos CPFs
+duplicidades
+status atual do sócio no legado
+```
+
+---
+
+## 10. Decisões consolidadas
 
 | Tema | Decisão |
 |---|---|
 | Número de sócio | Herdado da planilha/base legada inicialmente |
 | Tabela de legado | Criar `socios_legado` ou nome equivalente |
+| CPF no cadastro | CPF já é obrigatório no cadastro do app |
 | Conciliação | Principalmente por CPF |
+| Vínculo com legado | Automático quando CPF bater |
+| Aprovação prévia da sede | Não é necessária para criar vínculo inicial com legado |
 | Vínculo por usuário | Um usuário possui no máximo um registro principal em `socios` |
 | Sócio legado | Entra como inativo até validação/atualização pela sede |
 | Mudança de plano | Atualiza o mesmo sócio/assinatura, não cria novo sócio |
@@ -250,15 +299,15 @@ quem pode reativar?
 | Fidelidade | Conta pagamentos pelo app; legado pode receber ajuste manual pela sede |
 | Carteirinha | Reflete ativo/inativo; não desaparece automaticamente |
 | Inadimplência | Torna sócio inativo e restringe benefícios de ativo |
+| Layout da planilha | Pendente; esperado como similar ao cadastro atual |
 
 ---
 
-## 10. Próximos pontos a decidir
+## 11. Próximos pontos a decidir
 
-1. O CPF será obrigatório no cadastro inicial ou apenas na etapa de associação/perfil?
-2. Qual formato de armazenamento seguro de CPF será adotado?
-3. Qual será o layout/estrutura da planilha legada?
-4. Haverá tela de revisão de possíveis matches antes de vincular automaticamente?
+1. Qual formato de armazenamento seguro de CPF será adotado?
+2. Qual será o layout/estrutura real da planilha legada?
+3. Qual regra define quando inadimplência muda o sócio para inativo?
+4. Reativação será automática após pagamento ou manual pela sede?
 5. Quem poderá alterar mensalidades de fidelidade no sistema de gerenciamento?
-6. Qual regra define quando inadimplência muda o sócio para inativo?
-7. Reativação será automática após pagamento ou manual pela sede?
+6. O vínculo automático por CPF terá alguma rotina de auditoria/notificação para a sede?
