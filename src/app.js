@@ -5,6 +5,7 @@ const cors = require("cors");
 
 const usuarioRoutes = require("./routes/UsuarioRoutes.js");
 const menuRoutes = require("./routes/menuRoutes.js");
+const memberRoutes = require("./routes/memberRoutes.js");
 const errorHandler = require("./middlewares/errorHandler.js");
 
 const app = express();
@@ -33,6 +34,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/usuarios", usuarioRoutes);
 app.use("/api", menuRoutes);
+app.use("/api", memberRoutes);
 
 app.get("/", (_req, res) => {
   res.send("🚀 API Savóia rodando!");
