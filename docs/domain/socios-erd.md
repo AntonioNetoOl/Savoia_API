@@ -1,6 +1,6 @@
 # ERD inicial — Domínio de Sócios
 
-Este documento apresenta uma primeira proposta de relacionamento entre entidades.
+Este documento apresenta a proposta inicial de relacionamento entre entidades do domínio de sócios.
 
 O objetivo é validar o desenho antes de criar migrations.
 
@@ -10,15 +10,18 @@ O objetivo é validar o desenho antes de criar migrations.
 
 ```mermaid
 erDiagram
-    usuarios ||--o| socios : "pode possuir"
+    usuarios ||--o| socios : "possui no maximo um"
     usuarios ||--o{ metodos_pagamento : "cadastra"
     usuarios ||--o{ auditoria_socio : "executa"
+    usuarios ||--o| socios_legado : "pode vincular"
+
+    socios_legado ||--o| socios : "origina vinculo"
 
     socios ||--o{ assinaturas : "possui"
     socios ||--o{ cobrancas : "recebe"
     socios ||--o{ fidelidade_movimentos : "gera"
     socios ||--o{ beneficios_socio : "possui"
-    socios ||--o{ carteirinhas : "emite"
+    socios ||--o{ carteirinhas : "exibe"
     socios ||--o{ auditoria_socio : "registra"
 
     planos_associacao ||--o{ assinaturas : "define"
@@ -39,9 +42,27 @@ erDiagram
         timestamp updated_at
     }
 
+    socios_legado {
+        int id_socio_legado PK
+        string numero_socio_legado
+        string nome
+        string cpf
+        string email
+        string telefone
+        string status_legado
+        string origem_importacao
+        int linha_origem
+        timestamp importado_em
+        timestamp vinculado_em
+        int id_usuario_vinculado FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
     socios {
         int id_socio PK
         int id_usuario FK
+        int id_socio_legado FK
         string numero_socio
         string status_socio
         string tipo_origem
@@ -180,13 +201,37 @@ erDiagram
 
 `socios` representa o vínculo associativo.
 
-Relacionamento sugerido:
+Relacionamento confirmado para a primeira versão:
 
 ```txt
 usuarios 1 → 0..1 socios
 ```
 
-Na primeira versão, é recomendável permitir apenas um sócio ativo/vigente por usuário.
+Um usuário não deve possuir múltiplos vínculos principais de sócio. Se o sócio muda de plano, interrompe pagamento ou é reativado, o mesmo registro de `socios` deve ser atualizado.
+
+---
+
+## Sócios legados
+
+`socios_legado` representa a planilha/base atual de sócios da Savóia.
+
+Essa tabela deve preservar:
+
+- número de sócio legado;
+- CPF ou dado único usado para conciliação;
+- dados auxiliares da planilha;
+- vínculo futuro com usuário do app.
+
+Fluxo esperado:
+
+```txt
+usuário informa CPF
+→ sistema busca em socios_legado
+→ se encontrar, cria socios com tipo_origem = legacy_import
+→ numero_socio recebe numero_socio_legado
+→ status_socio inicia como inactive
+→ sede/backoffice valida e ajusta fidelidade quando necessário
+```
 
 ---
 
@@ -212,6 +257,13 @@ legacy_import
 manual_admin
 ```
 
+Para legado, a regra inicial é:
+
+```txt
+tipo_origem = legacy_import
+status_socio = inactive
+```
+
 ---
 
 ## Pagamentos
@@ -224,8 +276,8 @@ socios → assinaturas → cobrancas
 
 Isso permite:
 
-- sócio sem recorrência ativa;
-- sócio legado ativo sem gateway inicialmente;
+- sócio inativo sem apagar histórico;
+- mudança de plano sem criar novo sócio;
 - várias cobranças por assinatura;
 - cobranças futuras, pendentes, pagas e falhas.
 
@@ -234,8 +286,6 @@ Isso permite:
 ## Métodos de pagamento
 
 `metodos_pagamento` pertence ao usuário, não diretamente ao sócio.
-
-Motivo: método de pagamento é dado de conta/gateway. Caso no futuro exista outra relação financeira, o método pode continuar associado ao usuário.
 
 Nenhum dado sensível deve ser salvo diretamente.
 
@@ -264,14 +314,19 @@ payload sensível do gateway sem necessidade
 
 `fidelidade_movimentos` é uma ledger/tabela de movimentos.
 
-Isso é melhor do que manter apenas um contador no sócio, porque permite auditoria:
+A fidelidade contará pagamentos pelo app.
 
-- pagamento contado;
-- estorno;
-- ajuste manual;
-- resgate de benefício.
+Para sócio legado, a sede/backoffice poderá criar ajuste manual auditável.
 
-O progresso pode ser calculado por soma dos movimentos válidos.
+Tipos importantes:
+
+```txt
+payment_counted
+payment_reversed
+manual_adjustment
+legacy_adjustment
+benefit_redeemed
+```
 
 ---
 
@@ -281,12 +336,7 @@ O progresso pode ser calculado por soma dos movimentos válidos.
 
 `beneficios_socio` é instância do benefício liberado para um sócio.
 
-Isso permite saber:
-
-- quando liberou;
-- se foi resgatado;
-- se expirou;
-- se foi cancelado.
+Benefícios de sócio ativo devem depender do status atual do sócio.
 
 ---
 
@@ -294,13 +344,17 @@ Isso permite saber:
 
 `carteirinhas` depende de `socios`.
 
-Regra sugerida:
+Regra atualizada:
 
 ```txt
-Somente sócio active pode ter carteirinha active.
+A carteirinha existe para refletir o status atual do sócio.
 ```
 
-A carteirinha pode ser revogada sem apagar histórico.
+Se o sócio estiver ativo, a carteirinha mostra ativo.
+
+Se o sócio estiver inativo, a carteirinha mostra inativo.
+
+A carteirinha de sócio inativo não deve permitir benefícios exclusivos de sócio ativo.
 
 ---
 
@@ -312,13 +366,15 @@ Exemplos:
 
 ```txt
 member_created
+legacy_member_linked
 member_validated
 member_activated
 member_inactivated
 member_cancelled
 card_issued
-card_revoked
+card_status_changed
 manual_loyalty_adjustment
+legacy_loyalty_adjustment
 ```
 
 Este ponto será importante quando houver backoffice.
@@ -327,10 +383,10 @@ Este ponto será importante quando houver backoffice.
 
 ## Questões para validação antes das migrations
 
-1. `usuarios 1 → 0..1 socios` é suficiente ou devemos permitir múltiplos vínculos históricos?
-2. `numero_socio` será único e obrigatório apenas após ativação?
-3. Carteirinha pode ter múltiplas emissões históricas por sócio?
-4. A assinatura pertence sempre ao sócio ou pode pertencer ao usuário?
-5. Benefícios resgatados devem permanecer para histórico mesmo após cancelamento do sócio?
-6. Fidelidade deve ser calculada por ledger ou materializada também no sócio para performance?
-7. A base legada terá número de sócio próprio que precisa ser preservado?
+1. CPF será obrigatório no cadastro inicial ou somente na etapa de associação/perfil?
+2. Como será armazenado CPF com segurança?
+3. Qual será o formato exato da planilha legada?
+4. O vínculo com legado será automático quando CPF bater ou exigirá revisão da sede?
+5. Qual regra de atraso muda sócio para inativo?
+6. Reativação por pagamento será automática ou manual?
+7. Carteirinha terá código próprio além do número de sócio?
