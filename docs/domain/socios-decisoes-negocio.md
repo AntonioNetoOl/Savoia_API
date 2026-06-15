@@ -55,10 +55,11 @@ updated_at
 
 ### Observações
 
-- `cpf` deve ser tratado como dado sensível.
+- `cpf` deve ser tratado como dado pessoal identificador e de alto impacto operacional.
 - O CPF já é obrigatório no cadastro atual do app.
 - A aplicação deve evitar expor CPF completo no frontend.
-- Recomenda-se armazenar CPF normalizado, e futuramente avaliar criptografia/hash dependendo da estratégia de segurança.
+- A decisão inicial aceita CPF normalizado no MVP, com controle de acesso e sem exposição no app.
+- A arquitetura alvo deve evoluir para `cpf_hash`, `cpf_encrypted` e `cpf_masked`, conforme documentado em `cpf-seguranca.md`.
 - `numero_socio_legado` deve ser preservado para emissão da futura carteirinha.
 
 ---
@@ -171,9 +172,17 @@ A fidelidade contará **somente pagamentos feitos pelo app**.
 
 Para sócios legados, a sede/backoffice poderá atualizar manualmente o número de mensalidades pagas ou saldo inicial de fidelidade através de um sistema de gerenciamento paralelo ao app, que será desenvolvido depois.
 
+### Regra de preservação por inadimplência
+
+Se o sócio não pagar, ele possui uma janela de até 30 dias a partir da data original de vencimento para regularizar sem perder a fidelidade acumulada.
+
+Se pagar antes de completar 30 dias de atraso, a fidelidade permanece e o sócio volta ao estado ativo automaticamente.
+
+Se passar de 30 dias sem regularização, a fidelidade zera.
+
 ### Implicação técnica
 
-A tabela de fidelidade deve suportar ajustes manuais auditáveis.
+A tabela de fidelidade deve suportar ajustes e reversões auditáveis.
 
 Tipos de movimento necessários:
 
@@ -183,9 +192,12 @@ payment_reversed
 manual_adjustment
 legacy_adjustment
 benefit_redeemed
+loyalty_reset
 ```
 
 O tipo `legacy_adjustment` representa ajuste realizado pela sede/backoffice para sócios vindos do legado.
+
+O tipo `loyalty_reset` representa zeragem por ultrapassar 30 dias de atraso.
 
 ---
 
@@ -218,34 +230,104 @@ socio_inativo → carteirinha exibe inativo
 
 ### Decisão
 
-Inadimplência não bloqueia a carteirinha imediatamente no sentido de remover a carteirinha.
+Pagamento mensal vence no dia definido da cobrança, por exemplo dia 12.
 
-O usuário passa a ser `socio_inativo`.
+Se o usuário não pagar, haverá tolerância de 1 semana.
 
-Esse estado será refletido na carteirinha e usado para impedir benefícios de sócio ativo.
+Após essa tolerância, o sócio muda para `inactive` e passa a aparecer no app como `socio_inativo`.
+
+A carteirinha continua existindo, mas reflete status inativo.
+
+Benefícios de sócio ativo ficam indisponíveis enquanto o status estiver inativo.
+
+### Janela de fidelidade
+
+A fidelidade permanece armazenada por até 30 dias a partir da data original de vencimento.
+
+Se o pagamento for regularizado antes de completar 30 dias de atraso:
+
+```txt
+pagamento confirmado
+→ reativação automática
+→ status_socio = active
+→ fidelidade preservada
+```
+
+Se passar de 30 dias sem regularização:
+
+```txt
+atraso > 30 dias
+→ fidelidade zera
+→ status_socio permanece inactive
+```
 
 ### Implicação técnica
 
 Fluxo inicial:
 
 ```txt
-pagamento falhou / recorrência interrompida
-→ sócio muda para inactive conforme regra de negócio
-→ carteirinha continua existindo, mas exibe status inativo
-→ benefícios de sócio ativo ficam indisponíveis
+vencimento no dia 12
+→ não pagou
+→ aguarda 7 dias de tolerância
+→ após tolerância, socios.status_socio = inactive
+→ até 30 dias do vencimento, fidelidade fica preservada
+→ pagamento antes de 30 dias reativa automaticamente
+→ sem pagamento após 30 dias, gera loyalty_reset
 ```
 
-Ainda será necessário definir a regra de tolerância antes de mudar para inativo:
+Ainda será necessário definir tecnicamente:
 
 ```txt
-quantos dias de atraso?
-quantas tentativas de cobrança?
-quem pode reativar?
+como o job diário verificará atrasos
+como a cobrança será atualizada pelo gateway
+qual evento dispara o loyalty_reset
 ```
 
 ---
 
-## 9. Planilha legada
+## 9. Reativação
+
+### Decisão
+
+A reativação será automática após pagamento confirmado.
+
+Não haverá necessidade de ação manual da sede para reativar um sócio que regularizou pagamento dentro da regra definida.
+
+### Fluxo esperado
+
+```txt
+pagamento confirmado
+→ sistema identifica sócio inactive por inadimplência
+→ verifica se pagamento ocorreu dentro da janela de 30 dias
+→ status_socio = active
+→ assinatura/cobrança fica regularizada
+→ fidelidade é preservada se ainda estiver dentro da janela
+```
+
+---
+
+## 10. Sistema de gerenciamento
+
+### Decisão atual
+
+Alterações manuais de fidelidade, notificações para sede, auditorias administrativas e regras operacionais de backoffice serão modeladas posteriormente.
+
+O foco inicial permanece no app e na estrutura mínima necessária para suportar o domínio de sócios.
+
+### Implicação técnica
+
+Mesmo que o gerenciamento seja futuro, as tabelas devem nascer preparadas para auditoria e ajustes posteriores.
+
+Por isso, permanecem previstas:
+
+```txt
+fidelidade_movimentos
+auditoria_socio
+```
+
+---
+
+## 11. Planilha legada
 
 ### Decisão atual
 
@@ -282,13 +364,14 @@ status atual do sócio no legado
 
 ---
 
-## 10. Decisões consolidadas
+## 12. Decisões consolidadas
 
 | Tema | Decisão |
 |---|---|
 | Número de sócio | Herdado da planilha/base legada inicialmente |
 | Tabela de legado | Criar `socios_legado` ou nome equivalente |
 | CPF no cadastro | CPF já é obrigatório no cadastro do app |
+| Armazenamento de CPF | MVP aceita CPF normalizado com controle; alvo é hash/encrypted/masked |
 | Conciliação | Principalmente por CPF |
 | Vínculo com legado | Automático quando CPF bater |
 | Aprovação prévia da sede | Não é necessária para criar vínculo inicial com legado |
@@ -296,18 +379,22 @@ status atual do sócio no legado
 | Sócio legado | Entra como inativo até validação/atualização pela sede |
 | Mudança de plano | Atualiza o mesmo sócio/assinatura, não cria novo sócio |
 | Interrupção de pagamento | Mesmo sócio muda para inativo |
+| Tolerância de atraso | 1 semana após vencimento |
+| Inativação | Após tolerância sem pagamento |
+| Reativação | Automática após pagamento confirmado |
 | Fidelidade | Conta pagamentos pelo app; legado pode receber ajuste manual pela sede |
+| Preservação da fidelidade | Preserva até 30 dias após vencimento original |
+| Zeragem da fidelidade | Após mais de 30 dias de atraso |
 | Carteirinha | Reflete ativo/inativo; não desaparece automaticamente |
 | Inadimplência | Torna sócio inativo e restringe benefícios de ativo |
+| Sistema de gerenciamento | Será modelado depois, conforme necessidades do app |
 | Layout da planilha | Pendente; esperado como similar ao cadastro atual |
 
 ---
 
-## 11. Próximos pontos a decidir
+## 13. Próximos pontos a decidir
 
-1. Qual formato de armazenamento seguro de CPF será adotado?
-2. Qual será o layout/estrutura real da planilha legada?
-3. Qual regra define quando inadimplência muda o sócio para inativo?
-4. Reativação será automática após pagamento ou manual pela sede?
-5. Quem poderá alterar mensalidades de fidelidade no sistema de gerenciamento?
-6. O vínculo automático por CPF terá alguma rotina de auditoria/notificação para a sede?
+1. Qual será o layout/estrutura real da planilha legada?
+2. Reativação após 30 dias exigirá pagar apenas mensalidade atual, débitos antigos ou nova adesão?
+3. O vínculo automático por CPF terá alguma rotina de auditoria/notificação para a sede quando o gerenciamento existir?
+4. Qual será a estrutura mínima da primeira migration: somente tabelas de sócios/legado ou também cobranças/fidelidade?
