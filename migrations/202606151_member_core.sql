@@ -77,14 +77,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_planos_associacao_nome
   ON planos_associacao (LOWER(nome));
 
 INSERT INTO planos_associacao (nome, descricao, valor_mensal, moeda, ativo)
-VALUES (
+SELECT
   'Mensalidade Savóia',
   'Plano inicial de mensalidade da associação Savóia.',
   35.00,
   'BRL',
   TRUE
-)
-ON CONFLICT (LOWER(nome)) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM planos_associacao WHERE LOWER(nome) = LOWER('Mensalidade Savóia')
+);
 
 CREATE TABLE IF NOT EXISTS socios (
   id_socio BIGSERIAL PRIMARY KEY,
