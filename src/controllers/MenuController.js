@@ -56,12 +56,25 @@ async function getPayments(_req, res, next) {
   try {
     return res.json([
       {
+        id: "pay_3",
+        title: "Mensalidade Savóia",
+        amount: 35,
+        currency: "BRL",
+        status: "scheduled",
+        paidAt: null,
+        scheduledAt: "2026-04-10",
+        methodLabel: "Cartão final 1234",
+        competenceLabel: "Abril/2026",
+        source: "recurrence",
+      },
+      {
         id: "pay_1",
         title: "Mensalidade Savóia",
         amount: 35,
         currency: "BRL",
         status: "confirmed",
         paidAt: "2026-02-10",
+        scheduledAt: null,
         methodLabel: "Cartão final 1234",
         competenceLabel: "Fevereiro/2026",
         source: "app",
@@ -73,6 +86,7 @@ async function getPayments(_req, res, next) {
         currency: "BRL",
         status: "pending",
         paidAt: null,
+        scheduledAt: null,
         methodLabel: "Cartão final 1234",
         competenceLabel: "Março/2026",
         source: "app",
