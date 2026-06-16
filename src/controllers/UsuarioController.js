@@ -10,6 +10,7 @@ const {
 } = require("../validators/usuarioValidator");
 const { sendMail } = require("../utils/mailer");
 const { sixDigitCode } = require("../utils/random");
+const { linkLegacyMemberForUser } = require("../services/memberLegacyLinkService");
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
 
@@ -32,6 +33,21 @@ async function findUserByEmailOrCpf(identificador) {
 
   const { rows } = await db.query(sql, [val]);
   return rows[0] || null;
+}
+
+async function tryLinkLegacyMember(userId, cpf) {
+  try {
+    return await linkLegacyMemberForUser({ userId, cpf });
+  } catch (error) {
+    console.warn("⚠️ Não foi possível vincular sócio legado automaticamente:", error.message);
+    return {
+      linked: false,
+      reason: "legacy_link_error",
+      memberStatus: "nao_socio",
+      memberNumber: null,
+      legacyMemberId: null,
+    };
+  }
 }
 
 /* E-mail helpers ---------------------------------------------------------- */
@@ -255,6 +271,8 @@ async function confirmarCadastro(req, res, next) {
       await db.query("COMMIT");
 
       const user = ins.rows[0];
+      const memberLink = await tryLinkLegacyMember(user.id_usuario, data.cpf);
+
       return res.json({
         message: "Cadastro concluído.",
         usuario: {
@@ -264,6 +282,7 @@ async function confirmarCadastro(req, res, next) {
           status: user.status,
           email_verificado: user.email_verificado,
         },
+        memberLink,
       });
     } catch (e) {
       await db.query("ROLLBACK");
@@ -297,15 +316,29 @@ async function cadastrarUsuario(req, res) {
     }
 
     const senhaHash = await bcrypt.hash(senha, 10);
-    await db.query(
+    const ins = await db.query(
       `INSERT INTO usuarios
          (nome, cpf, email, senha_hash, numero, status, origem_cadastro, datacriacao, email_verificado)
        VALUES
-         ($1,$2,$3,$4,$5,'PENDENTE_VERIFICACAO','APP', NOW(), false)`,
+         ($1,$2,$3,$4,$5,'PENDENTE_VERIFICACAO','APP', NOW(), false)
+       RETURNING id_usuario, nome, email, status, email_verificado`,
       [nome, cpf, email, senhaHash, numero]
     );
 
-    return res.status(201).json({ message: "Cadastro realizado (LEGADO)." });
+    const user = ins.rows[0];
+    const memberLink = await tryLinkLegacyMember(user.id_usuario, cpf);
+
+    return res.status(201).json({
+      message: "Cadastro realizado (LEGADO).",
+      usuario: {
+        id: user.id_usuario,
+        nome: user.nome,
+        email: user.email,
+        status: user.status,
+        email_verificado: user.email_verificado,
+      },
+      memberLink,
+    });
   } catch (err) {
     console.error("❌ ERRO AO CADASTRAR (LEGADO):", err);
     res.status(500).json({ erro: "Erro interno do servidor." });
