@@ -4,7 +4,10 @@
   "main": "Server.js",
   "scripts": {
     "start": "node Server.js",
-    "dev": "nodemon Server.js"
+    "dev": "nodemon Server.js",
+    "migrate": "node scripts/runMigration.js",
+    "migrate:member-core": "node scripts/runMigration.js migrations/202606151_member_core.sql",
+    "migrate:member-core:down": "node scripts/runMigration.js migrations/202606151_member_core.down.sql"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
