@@ -8,11 +8,11 @@ function getUserIdFromToken(req) {
 function normalizeMemberStatus(status) {
   const normalized = String(status || "").trim().toLowerCase();
 
-  if (["socio_ativo", "ativo", "atualizado", "adimplente"].includes(normalized)) {
+  if (["socio_ativo", "ativo", "atualizado", "adimplente", "active"].includes(normalized)) {
     return "socio_ativo";
   }
 
-  if (["socio_inativo", "inativo", "pendente_verificacao", "pendente", "inadimplente"].includes(normalized)) {
+  if (["socio_inativo", "inativo", "pendente_verificacao", "pendente", "inadimplente", "inactive", "pending_validation", "cancelled"].includes(normalized)) {
     return "socio_inativo";
   }
 
@@ -28,9 +28,10 @@ async function getMe(req, res, next) {
     }
 
     const { rows } = await db.query(
-      `SELECT id_usuario, nome, email, status
-         FROM usuarios
-        WHERE id_usuario = $1
+      `SELECT u.id_usuario, u.nome, u.email, u.status, s.status_socio, s.numero_socio, s.tipo_origem
+         FROM usuarios u
+         LEFT JOIN socios s ON s.id_usuario = u.id_usuario
+        WHERE u.id_usuario = $1
         LIMIT 1`,
       [userId]
     );
@@ -45,7 +46,9 @@ async function getMe(req, res, next) {
       id: user.id_usuario,
       name: user.nome,
       email: user.email,
-      memberStatus: normalizeMemberStatus(user.status),
+      memberStatus: normalizeMemberStatus(user.status_socio || user.status),
+      memberNumber: user.numero_socio || null,
+      memberOrigin: user.tipo_origem || null,
     });
   } catch (error) {
     next(error);
