@@ -7,7 +7,9 @@
     "dev": "nodemon Server.js",
     "migrate": "node scripts/runMigration.js",
     "migrate:member-core": "node scripts/runMigration.js migrations/202606151_member_core.sql",
-    "migrate:member-core:down": "node scripts/runMigration.js migrations/202606151_member_core.down.sql"
+    "migrate:member-core:down": "node scripts/runMigration.js migrations/202606151_member_core.down.sql",
+    "members:link-legacy": "node scripts/linkExistingUsersToLegacyMembers.js",
+    "members:link-legacy:apply": "node scripts/linkExistingUsersToLegacyMembers.js --apply"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
