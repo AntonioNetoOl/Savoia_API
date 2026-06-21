@@ -6,5 +6,6 @@ const MemberController = require("../controllers/MemberController.js");
 const router = express.Router();
 
 router.get("/member/summary", authMiddleware, MemberController.getMemberSummary);
+router.get("/member/plans", authMiddleware, MemberController.getMemberPlans);
 
 module.exports = router;
