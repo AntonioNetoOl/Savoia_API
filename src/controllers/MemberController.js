@@ -103,6 +103,22 @@ function buildPlanSummary(user) {
   };
 }
 
+function buildAvailablePlanSummary(plan) {
+  return {
+    id: plan.id_plano,
+    code: plan.codigo_plano,
+    name: plan.nome,
+    description: plan.descricao || null,
+    monthlyAmount: toNumber(plan.valor_mensal, 0),
+    monthlyAmountLabel: formatCurrency(plan.valor_mensal, plan.moeda || "BRL"),
+    currency: plan.moeda || "BRL",
+    storeDiscountPercent: toNumber(plan.percentual_desconto_loja, 0),
+    requiredInstallmentsForGift: Number(plan.mensalidades_para_brinde || 12),
+    giftDescription: plan.descricao_brinde || null,
+    active: Boolean(plan.ativo),
+  };
+}
+
 function buildMemberSummary({ user, charges, loyalty, gifts }) {
   const rawStatus = user.status_socio || user.status;
   const memberStatus = normalizeMemberStatus(rawStatus);
@@ -347,6 +363,34 @@ async function getMemberSummary(req, res, next) {
   }
 }
 
+async function getMemberPlans(_req, res, next) {
+  try {
+    const { rows } = await db.query(
+      `SELECT id_plano,
+              codigo_plano,
+              nome,
+              descricao,
+              valor_mensal,
+              moeda,
+              percentual_desconto_loja,
+              mensalidades_para_brinde,
+              descricao_brinde,
+              ativo
+         FROM planos_associacao
+        WHERE ativo = TRUE
+          AND codigo_plano IS NOT NULL
+        ORDER BY valor_mensal ASC, id_plano ASC`
+    );
+
+    return res.json({
+      plans: rows.map(buildAvailablePlanSummary),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getMemberSummary,
+  getMemberPlans,
 };
