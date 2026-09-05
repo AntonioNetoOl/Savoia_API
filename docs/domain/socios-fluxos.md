@@ -27,7 +27,7 @@ blocked
 cancelled
 ```
 
-A API os apresenta ao aplicativo por meio de três estados visuais:
+O contrato do domínio apresenta ao aplicativo três estados visuais:
 
 | Situação | Estado visual |
 |---|---|
@@ -36,6 +36,8 @@ A API os apresenta ao aplicativo por meio de três estados visuais:
 | `pending_validation`, `inactive`, `blocked` ou `cancelled` | `socio_inativo` |
 
 `app_new`, `legacy_import` e `manual_admin` são valores internos de `tipo_origem`. Eles explicam como o vínculo surgiu e não devem ser usados como rótulo visual principal.
+
+`usuarios.status` representa o estado da conta. A existência e o estado da associação devem ser derivados de `socios`, sem misturar os dois conceitos.
 
 ## Endpoints implementados
 
@@ -140,5 +142,4 @@ Esses itens só devem ser documentados como implementados depois que existirem n
 - [DER do domínio de sócios](./der-socios.md)
 - [Benefícios e brindes de fidelidade](./beneficios-fidelidade.md)
 - [Execução e escopo das migrations](../../migrations/README.md)
-
 
