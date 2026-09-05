@@ -68,6 +68,7 @@ erDiagram
         timestamptz data_solicitacao
         timestamptz data_ativacao
         timestamptz data_inativacao
+        timestamptz inativo_desde
         timestamptz fidelidade_preservada_ate
         int validado_por FK
     }
@@ -217,6 +218,10 @@ blocked
 cancelled
 ```
 
+Esses são estados internos. A API apresenta `active` como `socio_ativo`; apresenta `pending_validation`, `inactive`, `blocked` e `cancelled` como `socio_inativo`; e usa `nao_socio` quando não existe registro em `socios`.
+
+`tipo_origem`, incluindo `legacy_import`, descreve a origem do vínculo e não é um estado visual.
+
 ### `socios_legado`
 
 Armazena a base histórica/importada de sócios antigos.
@@ -240,7 +245,9 @@ Atualmente concentra dados como:
 - descrição do brinde;
 - status ativo/inativo.
 
-Os planos atuais são `mutley`, `dick` e `vigarista`.
+Os planos atuais são `mutley` (R$ 30,00 e 10% de desconto), `dick` (R$ 50,00 e 15%) e `vigarista` (R$ 75,00 e 20%). Todos usam a regra de brinde após 12 mensalidades consecutivas pagas.
+
+As regras completas estão em [Benefícios e brindes de fidelidade](./beneficios-fidelidade.md).
 
 ### `auditoria_socio`
 
@@ -351,7 +358,7 @@ cancelled
 expired
 ```
 
-O resgate planejado é presencial na sede e sujeito à disponibilidade de estoque.
+O resgate é presencial na sede e sujeito à disponibilidade de estoque.
 
 ## Relacionamentos físicos e comportamento de deleção
 

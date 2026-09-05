@@ -1,35 +1,42 @@
 # Savóia API
 
-API REST do ecossistema Savóia, responsável por autenticação, usuários, regras do domínio de associados, integrações do aplicativo e persistência em PostgreSQL.
+API REST do ecossistema Savóia, responsável por autenticação, usuários, domínio de associados, integrações do aplicativo e persistência em PostgreSQL.
 
-O aplicativo mobile que consome esta API está em:
+O aplicativo mobile que consome esta API está em `AntonioNetoOl/Sav-ia-APP`.
 
-`AntonioNetoOl/Sav-ia-APP`
+## Visão do domínio de sócios
+
+A conta de acesso e o vínculo associativo são conceitos diferentes:
+
+```text
+usuarios = conta/login no aplicativo
+socios   = vínculo associativo com a Savóia
+```
+
+Um usuário pode existir sem ser sócio. Quando existe vínculo, `socios.id_usuario` é único: cada usuário pode ter no máximo um registro em `socios`.
+
+O aplicativo apresenta três estados:
+
+| Estado visual | Significado |
+|---|---|
+| `nao_socio` | O usuário não possui registro em `socios` |
+| `socio_inativo` | Existe vínculo, mas o estado interno não é `active` |
+| `socio_ativo` | O estado interno do vínculo é `active` |
+
+Valores como `legacy_import` descrevem a origem interna do vínculo e não são estados visuais.
+
+O estado da conta em `usuarios.status` é independente do estado associativo e não deve ser usado para decidir se alguém é sócio.
 
 ## Stack
 
-- Node.js
-- Express
-- PostgreSQL
-- `pg`
-- JWT
-- bcrypt
-- Joi
-- Nodemailer
-- dotenv
-
-## Responsabilidades atuais
-
-- cadastro e autenticação de usuários;
-- geração e validação de JWT;
-- recuperação de acesso por código;
-- integração de e-mail via SMTP;
-- área e regras de associação de sócios;
-- vínculo com registros legados de associados;
-- informações de menu consumidas pelo aplicativo;
-- pagamentos, fidelidade e benefícios em evolução;
-- migrations SQL versionadas;
-- documentação de domínio e modelagem.
+- Node.js;
+- Express;
+- PostgreSQL e `pg`;
+- JWT;
+- bcrypt;
+- Joi;
+- Nodemailer;
+- dotenv.
 
 ## Estrutura principal
 
@@ -44,15 +51,13 @@ src/
 └── validators/    validações de entrada
 
 migrations/        migrations SQL e scripts de rollback
-docs/domain/       decisões, fluxos, ERD e modelagem do domínio
+docs/domain/       domínio, fluxos, DER, fidelidade e brindes
 scripts/           execução de migrations
 ```
 
 ## Configuração
 
-Crie seu arquivo local `.env` a partir de `.env.example` e ajuste as variáveis conforme seu ambiente.
-
-Variáveis principais:
+Crie o arquivo local `.env` a partir de `.env.example` e ajuste as variáveis conforme o ambiente:
 
 ```text
 PORT
@@ -73,27 +78,12 @@ Nenhuma credencial real deve ser versionada no repositório.
 
 ## Executar localmente
 
-### Instalar dependências
-
 ```bash
 npm install
-```
-
-### Executar migrations
-
-```bash
-npm run migrate
-```
-
-Também existem scripts específicos para os conjuntos de migrations de associados, pagamentos e fidelidade.
-
-### Desenvolvimento
-
-```bash
 npm run dev
 ```
 
-### Execução padrão
+Para a execução padrão:
 
 ```bash
 npm start
@@ -101,32 +91,63 @@ npm start
 
 Por padrão, a aplicação utiliza a porta `4000` quando `PORT` não é informada.
 
-## Banco de dados
+Antes de iniciar contra um banco ainda não preparado, execute as migrations na ordem:
 
-A camada de persistência utiliza PostgreSQL com pool de conexões e suporte a transações explícitas.
+```bash
+npm run migrate:member-core
+npm run migrate:member-finance-loyalty
+```
 
-As migrations do domínio de associados estão versionadas em `migrations/`, incluindo scripts de aplicação e rollback.
+O comando genérico de migration exige o caminho de um arquivo SQL. Os atalhos e rollbacks disponíveis estão documentados em [`migrations/README.md`](migrations/README.md).
 
-## Documentação de domínio
+## Endpoints do domínio de sócios
 
-Documentos principais:
+Os endpoints abaixo exigem autenticação:
 
-- [DER do domínio de sócios](docs/domain/der-socios.md);
-- [Benefícios e brindes de fidelidade](docs/domain/beneficios-fidelidade.md).
+| Método | Endpoint | Responsabilidade |
+|---|---|---|
+| `GET` | `/api/member/summary` | Retorna o estado visual do usuário e o resumo disponível de associação, plano, fidelidade, cobranças, recorrência, benefícios e brinde |
+| `GET` | `/api/member/plans` | Lista os planos de associação ativos |
+| `POST` | `/api/member/association-request` | Registra uma solicitação de associação ou regularização a partir de `planCode` |
 
-A pasta `docs/domain/` também reúne documentação técnica sobre:
+O `POST /api/member/association-request` cria ou reutiliza o único registro em `socios`, mantém a solicitação em `pending_validation` e grava auditoria quando há mudança. Ele não cria assinatura ou cobrança, não processa pagamento e não ativa o sócio automaticamente.
 
-- decisões de negócio para associados;
-- modelagem das entidades;
-- fluxos do domínio;
-- pagamentos e recorrência;
-- fidelidade e benefícios;
-- futura carteirinha digital.
+Detalhes de estados, respostas e fluxos estão em [`docs/domain/socios-fluxos.md`](docs/domain/socios-fluxos.md).
+
+## Planos atuais
+
+| Plano | Mensalidade | Desconto nas lojas | Fidelidade |
+|---|---:|---:|---|
+| Mutley | R$ 30,00 | 10% | Brinde após 12 mensalidades consecutivas pagas |
+| Dick | R$ 50,00 | 15% | Brinde após 12 mensalidades consecutivas pagas |
+| Vigarista | R$ 75,00 | 20% | Brinde após 12 mensalidades consecutivas pagas |
+
+O brinde é retirado presencialmente na sede e está sujeito à disponibilidade de estoque. Benefícios gerais do sócio não são a mesma coisa que o brinde de fidelidade.
+
+## Banco e estágio atual
+
+As migrations já criam a estrutura de associação, planos, auditoria, métodos de pagamento, assinaturas, cobranças, fidelidade e brindes. A existência dessas tabelas não significa que o fluxo financeiro completo esteja implementado.
+
+Continuam fora do escopo atual:
+
+- gateway e checkout reais;
+- carteirinha digital e QR Code;
+- backoffice;
+- controle real de estoque;
+- cupom online;
+- automação de inadimplência;
+- automação de zeragem de fidelidade.
+
+## Documentação
+
+- [Domínio, estados, endpoints e fluxos de sócios](docs/domain/socios-fluxos.md)
+- [DER do domínio de sócios](docs/domain/der-socios.md)
+- [Benefícios e brindes de fidelidade](docs/domain/beneficios-fidelidade.md)
+- [Execução e escopo das migrations](migrations/README.md)
+
+As migrations são a fonte de verdade para o schema. O runtime é a fonte de verdade para os comportamentos já implementados.
 
 ## Segurança
 
-O projeto utiliza hash de senha, autenticação por JWT e configuração sensível via variáveis de ambiente. Para ambientes reais, utilize um `JWT_SECRET` forte, restrinja o `CORS_ORIGIN` e nunca versione credenciais ou segredos.
+O projeto utiliza hash de senha, autenticação por JWT e configuração sensível via variáveis de ambiente. Em ambientes reais, use um `JWT_SECRET` forte, restrinja `CORS_ORIGIN` e nunca versione credenciais ou segredos.
 
-## Status
-
-Projeto em desenvolvimento contínuo, com foco atual na evolução do domínio de associados e sua integração com o aplicativo Savóia.

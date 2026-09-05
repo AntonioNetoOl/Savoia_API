@@ -1,169 +1,82 @@
-# Benefícios e brindes de fidelidade — APP Savóia
+# Benefícios e brindes de fidelidade
 
-Este documento registra a regra correta de benefícios e brindes para evitar ambiguidade na modelagem de banco.
+Este documento registra as regras atuais de benefícios e brindes do domínio de sócios.
 
----
+## Conceitos distintos
 
-## 1. Conceitos
+Benefício geral e brinde de fidelidade não são a mesma coisa:
 
-No contexto da associação Savóia, existem dois conceitos diferentes:
+- **benefício geral**: vantagem disponível ao sócio ativo, como o desconto nas lojas definido pelo plano;
+- **brinde de fidelidade**: item liberado após o cumprimento da regra de mensalidades consecutivas pagas.
 
-```txt
-benefícios gerais
-brinde de fidelidade
+No schema atual, o desconto e a descrição do brinde ficam em `planos_associacao`. Um direito a brinde já liberado pertence a `brindes_fidelidade_socio`.
+
+Não existem tabelas genéricas `beneficios` ou `beneficios_socio` nas migrations atuais.
+
+## Planos vigentes
+
+| Código | Plano | Mensalidade | Desconto nas lojas | Regra do brinde | Descrição cadastrada |
+|---|---|---:|---:|---|---|
+| `mutley` | Mutley | R$ 30,00 | 10% | 12 mensalidades consecutivas pagas | Boné, pescador ou touca |
+| `dick` | Dick | R$ 50,00 | 15% | 12 mensalidades consecutivas pagas | Camiseta, regata ou bermuda |
+| `vigarista` | Vigarista | R$ 75,00 | 20% | 12 mensalidades consecutivas pagas | Agasalho ou calça |
+
+Os valores e descrições são cadastrados pela migration [`202606162_member_finance_loyalty.sql`](../../migrations/202606162_member_finance_loyalty.sql).
+
+## Benefícios gerais
+
+O acesso a benefícios gerais depende do estado associativo e das regras comerciais vigentes. No app, o estado elegível é `socio_ativo`.
+
+O percentual de desconto nas lojas é definido pelo plano atual do sócio. A API já consegue expor esse percentual no resumo, mas não existe fluxo individual de resgate para benefícios gerais.
+
+## Brinde de fidelidade
+
+A regra vigente é:
+
+```text
+12 mensalidades consecutivas pagas
+→ direito a brinde disponível
+→ retirada presencial na sede
+→ item sujeito à disponibilidade de estoque
 ```
 
-Eles não devem ser tratados como a mesma coisa no banco.
+Os estados aceitos para um registro em `brindes_fidelidade_socio` são:
 
----
-
-## 2. Benefícios gerais do sócio em dia
-
-Todo sócio em dia tem acesso a benefícios gerais, conforme disponibilidade e regra operacional.
-
-Exemplos informados:
-
-```txt
-- desconto em ingresso no Allianz, quando disponível
-- desconto em caravanas
-- desconto em eventos da torcida
-- desconto nas lojas da torcida conforme plano
+```text
+available
+redeemed
+cancelled
+expired
 ```
 
-Esses benefícios dependem principalmente de:
+A tabela representa o direito ao brinde e seu resgate. Ela não representa estoque físico nem cupom para loja online.
 
-```txt
-status_socio = active
-plano atual do sócio
-regras comerciais vigentes
-```
+## Estrutura existente e automações pendentes
 
-Para o MVP, eles podem ser exibidos no app como informação institucional, sem exigir uma tabela individual de resgate por usuário.
+O banco já possui:
 
----
+- `planos_associacao`, com preço, desconto e regra do brinde;
+- `cobrancas`, para competências e estados de pagamento;
+- `fidelidade_movimentos`, como histórico de contagem, reversão, ajuste, resgate e zeragem;
+- `brindes_fidelidade_socio`, para os brindes liberados por ciclo.
 
-## 3. Planos informados
+Essa estrutura está preparada para o fluxo financeiro, mas ainda não existem automações completas para:
 
-### Plano Mutley
+- processar pagamentos em gateway real;
+- gerar e atualizar cobranças de ponta a ponta;
+- contar automaticamente as 12 mensalidades consecutivas;
+- liberar automaticamente o brinde;
+- aplicar inadimplência e zeragem de fidelidade;
+- controlar estoque ou confirmar a retirada por backoffice.
 
-```txt
-valor_mensal = 30.00
-percentual_desconto_loja = 10
-brinde após 12 mensalidades pagas = 1 Boné ou Pescador ou Touca
-```
+## Fora do escopo atual
 
-### Plano Dick
+- gateway e checkout reais;
+- cupom online;
+- controle real de estoque;
+- backoffice;
+- carteirinha digital e QR Code.
 
-```txt
-valor_mensal = 50.00
-percentual_desconto_loja = 15
-brinde após 12 mensalidades pagas = 1 Camiseta ou Regata ou Bermuda
-```
+Os relacionamentos físicos dessas tabelas estão no [DER do domínio de sócios](./der-socios.md).
 
-### Plano Vigarista
 
-```txt
-valor_mensal = 75.00
-percentual_desconto_loja = 20
-brinde após 12 mensalidades pagas = 1 Agasalho ou Calça
-```
-
----
-
-## 4. Brinde de fidelidade
-
-O brinde de fidelidade é liberado após:
-
-```txt
-12 mensalidades consecutivas pagas, sem interrupções
-```
-
-A regra correta é:
-
-```txt
-pagou 12 mensalidades consecutivas
-→ brinde fica disponível para retirada
-→ retirada deve ser feita na sede
-→ item depende da disponibilidade em estoque
-```
-
----
-
-## 5. Resgate do brinde
-
-O resgate não deve ser modelado agora como cupom online.
-
-Regra atual:
-
-```txt
-resgate presencial na sede
-sujeito à disponibilidade do item em estoque
-```
-
-O sistema deve conseguir marcar o brinde como:
-
-```txt
-disponível
-resgatado
-cancelado
-expirado, se uma regra futura definir expiração
-```
-
----
-
-## 6. Código para loja online
-
-A geração de código para compra no site/loja online fica fora de escopo por enquanto.
-
-Não criar nesta fase:
-
-```txt
-codigo_cupom
-cupom_online
-integracao_loja_online
-```
-
-Esse tema será estudado futuramente.
-
----
-
-## 7. Implicação para a segunda migration
-
-A segunda migration deve evitar nomes genéricos demais como se todo benefício fosse um cupom digital.
-
-Recomendação de modelagem:
-
-```txt
-planos_associacao
-  - adicionar codigo_plano
-  - adicionar percentual_desconto_loja
-  - adicionar mensalidades_para_brinde
-  - adicionar descricao_brinde
-
-cobrancas
-  - controlar mensalidades pagas
-  - controlar inadimplência e janela de fidelidade
-
-fidelidade_movimentos
-  - controlar sequência/consecutividade
-  - registrar pagamento contado, reversão e zeragem
-
-brindes_fidelidade_socio
-  - controlar brinde liberado para o sócio
-  - status: available, redeemed, cancelled, expired
-```
-
----
-
-## 8. Fora do escopo nesta fase
-
-```txt
-carteirinha digital
-QR Code
-cupom para loja online
-controle de estoque real
-sistema de gerenciamento/backoffice
-integração com gateway financeiro real
-```
-
-O controle de estoque e a confirmação operacional do resgate serão melhor definidos quando o sistema de gerenciamento for modelado.
