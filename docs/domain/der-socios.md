@@ -68,7 +68,7 @@ erDiagram
         timestamptz data_solicitacao
         timestamptz data_ativacao
         timestamptz data_inativacao
-        date fidelidade_preservada_ate
+        timestamptz fidelidade_preservada_ate
         int validado_por FK
     }
 
