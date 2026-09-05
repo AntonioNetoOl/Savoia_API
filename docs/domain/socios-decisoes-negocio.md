@@ -59,7 +59,7 @@ updated_at
 - O CPF já é obrigatório no cadastro atual do app.
 - A aplicação deve evitar expor CPF completo no frontend.
 - A decisão inicial aceita CPF normalizado no MVP, com controle de acesso e sem exposição no app.
-- A arquitetura alvo deve evoluir para `cpf_hash`, `cpf_encrypted` e `cpf_masked`, conforme documentado em `cpf-seguranca.md`.
+- A arquitetura alvo deve evoluir para `cpf_hash`, `cpf_encrypted` e `cpf_masked`.
 - `numero_socio_legado` deve ser preservado para emissão da futura carteirinha.
 
 ---

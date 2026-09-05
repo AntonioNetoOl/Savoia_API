@@ -116,7 +116,6 @@ Documentos principais:
 
 A pasta `docs/domain/` também reúne documentação técnica sobre:
 
-- segurança e tratamento de CPF;
 - decisões de negócio para associados;
 - modelagem das entidades;
 - fluxos do domínio;
