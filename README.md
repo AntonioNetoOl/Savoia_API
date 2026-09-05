@@ -25,6 +25,8 @@ O aplicativo apresenta três estados:
 
 Valores como `legacy_import` descrevem a origem interna do vínculo e não são estados visuais.
 
+O estado da conta em `usuarios.status` é independente do estado associativo e não deve ser usado para decidir se alguém é sócio.
+
 ## Stack
 
 - Node.js;
@@ -142,5 +144,4 @@ As migrations são a fonte de verdade para o schema. O runtime é a fonte de ver
 ## Segurança
 
 O projeto utiliza hash de senha, autenticação por JWT e configuração sensível via variáveis de ambiente. Em ambientes reais, use um `JWT_SECRET` forte, restrinja `CORS_ORIGIN` e nunca versione credenciais ou segredos.
-
 
