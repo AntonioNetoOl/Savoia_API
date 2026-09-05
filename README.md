@@ -80,7 +80,6 @@ Nenhuma credencial real deve ser versionada no repositório.
 
 ```bash
 npm install
-npm run migrate
 npm run dev
 ```
 
@@ -92,7 +91,14 @@ npm start
 
 Por padrão, a aplicação utiliza a porta `4000` quando `PORT` não é informada.
 
-O comando genérico de migration recebe o caminho de um arquivo SQL. Os atalhos e rollbacks disponíveis estão documentados em [`migrations/README.md`](migrations/README.md).
+Antes de iniciar contra um banco ainda não preparado, execute as migrations na ordem:
+
+```bash
+npm run migrate:member-core
+npm run migrate:member-finance-loyalty
+```
+
+O comando genérico de migration exige o caminho de um arquivo SQL. Os atalhos e rollbacks disponíveis estão documentados em [`migrations/README.md`](migrations/README.md).
 
 ## Endpoints do domínio de sócios
 
