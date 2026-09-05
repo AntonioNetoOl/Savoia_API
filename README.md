@@ -109,13 +109,17 @@ As migrations do domínio de associados estão versionadas em `migrations/`, inc
 
 ## Documentação de domínio
 
-A pasta `docs/domain/` reúne documentação técnica sobre:
+Documentos principais:
+
+- [DER do domínio de sócios](docs/domain/der-socios.md);
+- [Benefícios e brindes de fidelidade](docs/domain/beneficios-fidelidade.md).
+
+A pasta `docs/domain/` também reúne documentação técnica sobre:
 
 - segurança e tratamento de CPF;
 - decisões de negócio para associados;
 - modelagem das entidades;
 - fluxos do domínio;
-- ERD;
 - pagamentos e recorrência;
 - fidelidade e benefícios;
 - futura carteirinha digital.
