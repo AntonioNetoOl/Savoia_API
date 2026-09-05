@@ -39,6 +39,10 @@ O contrato do domínio apresenta ao aplicativo três estados visuais:
 
 `usuarios.status` representa o estado da conta. A existência e o estado da associação devem ser derivados de `socios`, sem misturar os dois conceitos.
 
+### Ponto de consistência no runtime
+
+Na implementação atual de `GET /api/member/summary`, a normalização ainda usa `usuarios.status` como fallback quando `socios.status_socio` não existe. Isso pode classificar uma conta sem registro em `socios` como estado de sócio. O contrato do domínio acima permanece válido; a correção exige uma alteração de runtime e não faz parte desta revisão documental.
+
 ## Endpoints implementados
 
 Todos os endpoints abaixo exigem autenticação.
