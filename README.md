@@ -151,3 +151,8 @@ As migrations são a fonte de verdade para o schema. O runtime é a fonte de ver
 
 O projeto utiliza hash de senha, autenticação por JWT e configuração sensível via variáveis de ambiente. Em ambientes reais, use um `JWT_SECRET` forte, restrinja `CORS_ORIGIN` e nunca versione credenciais ou segredos.
 
+## Desenvolvimento com Codex
+
+- [Instruções para agentes](AGENTS.md)
+- [Harness de engenharia](docs/engineering/harness-engenharia.md)
+- [Adoção de Ponytail, skills e TDD](docs/engineering/adocao-codex.md)
