@@ -100,6 +100,13 @@ npm run migrate:member-finance-loyalty
 
 O comando genérico de migration exige o caminho de um arquivo SQL. Os atalhos e rollbacks disponíveis estão documentados em [`migrations/README.md`](migrations/README.md).
 
+## Testes de autenticação
+
+Com Node.js 22 e as dependências do lockfile instaladas (`npm ci`), execute `npm test`.
+O executor nativo testa o middleware e os controllers de login, validação do código de recuperação e redefinição, com JWT e bcrypt reais e dados sintéticos. Não lê `.env`, não envia e-mail e bloqueia conexões PostgreSQL; o driver é simulado. Isso não valida banco, SMTP ou integração HTTP reais.
+
+Tokens de login existentes, sem `kind`, continuam válidos. Tokens `kind: "pwdreset"` são recusados pelo middleware das rotas comuns com HTTP 401; continuam aceitos exclusivamente no fluxo de redefinição, conforme as verificações já existentes.
+
 ## Endpoints do domínio de sócios
 
 Os endpoints abaixo exigem autenticação:

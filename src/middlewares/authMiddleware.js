@@ -19,6 +19,10 @@ function authMiddleware(req, res, next) {
   try {
     const payload = jwt.verify(token, JWT_SECRET);
 
+    if (payload.kind === "pwdreset") {
+      return res.status(401).json({ erro: "Token inválido." });
+    }
+
     // Mantém compatibilidade com possíveis usos antigos de req.usuario
     // e padroniza req.user para as novas rotas.
     req.user = payload;
