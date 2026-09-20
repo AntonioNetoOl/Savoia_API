@@ -100,12 +100,14 @@ npm run migrate:member-finance-loyalty
 
 O comando genérico de migration exige o caminho de um arquivo SQL. Os atalhos e rollbacks disponíveis estão documentados em [`migrations/README.md`](migrations/README.md).
 
-## Testes de autenticação
+## Testes de autenticação e estados associativos
 
 Com Node.js 22 e as dependências do lockfile instaladas (`npm ci`), execute `npm test`.
 O executor nativo testa o middleware e os controllers de login, validação do código de recuperação e redefinição, com JWT e bcrypt reais e dados sintéticos. Não lê `.env`, não envia e-mail e bloqueia conexões PostgreSQL; o driver é simulado. Isso não valida banco, SMTP ou integração HTTP reais.
 
 Tokens de login existentes, sem `kind`, continuam válidos. Tokens `kind: "pwdreset"` são recusados pelo middleware das rotas comuns com HTTP 401; continuam aceitos exclusivamente no fluxo de redefinição, conforme as verificações já existentes.
+
+O mesmo comando executa `test/member-status.test.js`: testa as respostas dos controllers de resumo e menu para ausência de vínculo e todos os estados associativos, independentemente do status da conta e da origem. Verifica também erros de consulta, identificação obrigatória e a recusa de solicitação para vínculo bloqueado. O driver PostgreSQL é simulado; esses testes não comprovam locks, transações ou persistência real da solicitação.
 
 ## Testes de transações do cadastro
 
@@ -113,7 +115,7 @@ Execute `npm run test:registration` com PostgreSQL 18 instalado. No Windows, os 
 
 O comando cria e encerra uma instância descartável, com diretório temporário, porta livre em localhost e credenciais efêmeras. Antes de criar tabelas, confere o diretório reportado pelo servidor. Não lê `.env` nem utiliza o banco de desenvolvimento. A estrutura das três tabelas de cadastro em `test/fixtures/registration-schema.sql` foi exportada sem dados do ambiente de desenvolvimento; é uma fixture de teste, não uma migration. A migration core existente é aplicada apenas nessa instância para exercitar o vínculo legado.
 
-Os testes usam PostgreSQL real, inclusive falhas provocadas e concorrência. O pool recicla conexões a cada empréstimo para detectar transações incorretas por `pool.query`; nenhuma query é simulada. SMTP é simulado e logs de cadastro são silenciados para não expor códigos. A instância e seus arquivos são removidos ao terminar. `npm test` continua executando somente os testes de JWT, sem precisar iniciar PostgreSQL.
+Os testes usam PostgreSQL real, inclusive falhas provocadas e concorrência. O pool recicla conexões a cada empréstimo para detectar transações incorretas por `pool.query`; nenhuma query é simulada. SMTP é simulado e logs de cadastro são silenciados para não expor códigos. A instância e seus arquivos são removidos ao terminar. `npm test` executa os testes de JWT e estados associativos, sem precisar iniciar PostgreSQL.
 
 O envio de cadastro confirma sessão e código na mesma transação antes de tentar e-mail. A confirmação grava usuário e consumo de código/sessão na mesma transação; o vínculo legado é tentado após o commit. Falhas de SMTP ou de vínculo legado não desfazem esses commits. Esta correção não muda as políticas de cooldown ou consumo concorrente de OTP.
 

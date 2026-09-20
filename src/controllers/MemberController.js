@@ -1,34 +1,9 @@
 // src/controllers/MemberController.js
 const db = require("../config/DB");
+const getMemberStatus = require("../utils/memberStatus");
 
 function getUserIdFromToken(req) {
   return req.user?.id || req.user?.id_usuario || req.user?.sub || req.usuario?.id || req.usuario?.id_usuario || req.usuario?.sub;
-}
-
-function normalizeMemberStatus(status) {
-  const normalized = String(status || "").trim().toLowerCase();
-
-  if (["socio_ativo", "ativo", "atualizado", "adimplente", "active"].includes(normalized)) {
-    return "socio_ativo";
-  }
-
-  if (
-    [
-      "socio_inativo",
-      "inativo",
-      "pendente_verificacao",
-      "pendente",
-      "inadimplente",
-      "inactive",
-      "pending_validation",
-      "blocked",
-      "cancelled",
-    ].includes(normalized)
-  ) {
-    return "socio_inativo";
-  }
-
-  return "nao_socio";
 }
 
 function toNumber(value, fallback = 0) {
@@ -120,8 +95,7 @@ function buildAvailablePlanSummary(plan) {
 }
 
 function buildMemberSummary({ user, charges, loyalty, gifts }) {
-  const rawStatus = user.status_socio || user.status;
-  const memberStatus = normalizeMemberStatus(rawStatus);
+  const memberStatus = getMemberStatus(user);
   const statusContent = getStatusContent(memberStatus);
   const isActiveMember = memberStatus === "socio_ativo";
   const isInactiveMember = memberStatus === "socio_inativo";
@@ -217,7 +191,6 @@ async function getMemberBase(userId) {
     `SELECT u.id_usuario,
             u.nome,
             u.email,
-            u.status,
             s.id_socio,
             s.numero_socio,
             s.status_socio,

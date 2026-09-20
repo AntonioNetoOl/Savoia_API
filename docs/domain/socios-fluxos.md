@@ -41,7 +41,7 @@ O contrato do domínio apresenta ao aplicativo três estados visuais:
 
 ### Ponto de consistência no runtime
 
-Na implementação atual de `GET /api/member/summary`, a normalização ainda usa `usuarios.status` como fallback quando `socios.status_socio` não existe. Isso pode classificar uma conta sem registro em `socios` como estado de sócio. O contrato do domínio acima permanece válido; a correção exige uma alteração de runtime e não faz parte desta revisão documental.
+`GET /api/member/summary` e `GET /api/me` usam o mesmo mapeamento: sem `socios.id_socio`, retornam `nao_socio`; com vínculo, somente `active` retorna `socio_ativo`, e os demais estados retornam `socio_inativo`. O status da conta e a origem do vínculo não participam dessa classificação. A apresentação de `blocked` como inativo não altera sua inelegibilidade para solicitar associação.
 
 ## Endpoints implementados
 

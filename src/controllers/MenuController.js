@@ -1,22 +1,9 @@
 // src/controllers/MenuController.js
 const db = require("../config/DB");
+const getMemberStatus = require("../utils/memberStatus");
 
 function getUserIdFromToken(req) {
   return req.user?.id || req.user?.id_usuario || req.user?.sub || req.usuario?.id || req.usuario?.id_usuario || req.usuario?.sub;
-}
-
-function normalizeMemberStatus(status) {
-  const normalized = String(status || "").trim().toLowerCase();
-
-  if (["socio_ativo", "ativo", "atualizado", "adimplente", "active"].includes(normalized)) {
-    return "socio_ativo";
-  }
-
-  if (["socio_inativo", "inativo", "pendente_verificacao", "pendente", "inadimplente", "inactive", "pending_validation", "cancelled"].includes(normalized)) {
-    return "socio_inativo";
-  }
-
-  return "nao_socio";
 }
 
 async function getMe(req, res, next) {
@@ -28,7 +15,7 @@ async function getMe(req, res, next) {
     }
 
     const { rows } = await db.query(
-      `SELECT u.id_usuario, u.nome, u.email, u.status, s.status_socio, s.numero_socio, s.tipo_origem
+      `SELECT u.id_usuario, u.nome, u.email, s.id_socio, s.status_socio, s.numero_socio, s.tipo_origem
          FROM usuarios u
          LEFT JOIN socios s ON s.id_usuario = u.id_usuario
         WHERE u.id_usuario = $1
@@ -46,7 +33,7 @@ async function getMe(req, res, next) {
       id: user.id_usuario,
       name: user.nome,
       email: user.email,
-      memberStatus: normalizeMemberStatus(user.status_socio || user.status),
+      memberStatus: getMemberStatus(user),
       memberNumber: user.numero_socio || null,
       memberOrigin: user.tipo_origem || null,
     });

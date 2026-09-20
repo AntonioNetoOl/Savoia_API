@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "Server.js",
   "scripts": {
-    "test": "node --test test/token-purpose.test.js",
+    "test": "node --test test/token-purpose.test.js test/member-status.test.js",
     "test:registration": "node scripts/testRegistration.js",
     "start": "node Server.js",
     "dev": "nodemon Server.js",
