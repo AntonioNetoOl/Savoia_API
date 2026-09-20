@@ -26,7 +26,7 @@ Consulte [fluxos e contratos](docs/domain/socios-fluxos.md), [DER](docs/domain/d
 
 ## Verificação e limites
 
-Confirme os scripts no `package.json`. Há `start`, `dev`, atalhos de migrations e `test` com o executor nativo do Node para finalidade dos tokens JWT; ainda não há script de lint. Os testes isolam o driver PostgreSQL e não comprovam persistência real. Não invente resultados de `npm test`. `node --check caminho.js` só verifica sintaxe, não comportamento.
+Confirme os scripts no `package.json`. Há `start`, `dev`, atalhos de migrations, `test` (JWT com driver simulado) e `test:registration` (cadastro com PostgreSQL 18 descartável); ainda não há script de lint. Consulte o README antes dos testes de banco: eles criam uma instância própria e não usam `.env` ou o banco de desenvolvimento. Não invente resultados de testes. `node --check caminho.js` só verifica sintaxe, não comportamento.
 
 Não execute migrations/rollback como verificação rotineira. As migrations de sócios pressupõem tabelas preexistentes; consulte o README delas antes de preparar banco de teste. Novas migrations só em tarefa que as inclua; preserve migrations históricas aplicadas.
 

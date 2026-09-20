@@ -141,12 +141,11 @@ async function enviarOuReenviarCodigo(req, res, next) {
     const codigo = sixDigitCode();
     const expira = new Date(Date.now() + CODE_TTL_MIN * 60 * 1000);
 
-    await db.query("BEGIN");
-    try {
+    await db.withTx(async (client) => {
       // Só cria/atualiza sessão quando há payload (primeiro envio do cadastro)
       if (payload) {
-        await db.query("DELETE FROM sessoes_cadastro WHERE email=$1", [email]);
-        await db.query(
+        await client.query("DELETE FROM sessoes_cadastro WHERE email=$1", [email]);
+        await client.query(
           `INSERT INTO sessoes_cadastro (nome, cpf, email, senha_hash, numero, usado, criado_em, payload_json)
            VALUES ($1, $2, $3, $4, $5, false, NOW(), $6::jsonb)`,
           [
@@ -160,17 +159,12 @@ async function enviarOuReenviarCodigo(req, res, next) {
         );
       }
 
-      await db.query(
+      await client.query(
         `INSERT INTO verificacoes_email (id_usuario, email, tipo, codigo, expira_em, usado, tentativas, ip, user_agent, criado_em)
          VALUES (NULL, $1, $2, $3, $4, false, 0, $5, $6, NOW())`,
         [email, tipo, codigo, expira, req.ip || null, String(req.headers["user-agent"] || "") || null]
       );
-
-      await db.query("COMMIT");
-    } catch (e) {
-      await db.query("ROLLBACK");
-      throw e;
-    }
+    });
 
     // Log bonito no console (cadastro)
     console.log(`[VERIFY] para=${email} | codigo=${codigo} | expira=${expira.toISOString()}`);
@@ -248,29 +242,27 @@ async function confirmarCadastro(req, res, next) {
       senha_hash: sess.senha_hash,
     };
 
-    await db.query("BEGIN");
     try {
-      const ins = await db.query(
-        `INSERT INTO usuarios
+      const user = await db.withTx(async (client) => {
+        const ins = await client.query(
+          `INSERT INTO usuarios
            (nome, cpf, email, senha_hash, numero, status, origem_cadastro, datacriacao, email_verificado, verificado_em)
          VALUES
            ($1,$2,$3,$4,$5,'PENDENTE_VERIFICACAO','APP', NOW(), true, NOW())
          ON CONFLICT (email) DO NOTHING
          RETURNING id_usuario, nome, email, status, email_verificado`,
-        [data.nome, data.cpf, data.email, data.senha_hash, data.numero]
-      );
+          [data.nome, data.cpf, data.email, data.senha_hash, data.numero]
+        );
 
-      if (ins.rowCount === 0) {
-        await db.query("ROLLBACK");
-        return res.status(409).json({ erro: "Usuário já existe." });
-      }
+        if (ins.rowCount === 0) {
+          throw Object.assign(new Error("Usuário já existe."), { code: "user_already_exists" });
+        }
 
-      await db.query("UPDATE verificacoes_email SET usado=true WHERE id=$1", [verif.id]);
-      await db.query("UPDATE sessoes_cadastro SET usado=true WHERE email=$1", [email]);
+        await client.query("UPDATE verificacoes_email SET usado=true WHERE id=$1", [verif.id]);
+        await client.query("UPDATE sessoes_cadastro SET usado=true WHERE email=$1", [email]);
+        return ins.rows[0];
+      });
 
-      await db.query("COMMIT");
-
-      const user = ins.rows[0];
       const memberLink = await tryLinkLegacyMember(user.id_usuario, data.cpf);
 
       return res.json({
@@ -285,8 +277,7 @@ async function confirmarCadastro(req, res, next) {
         memberLink,
       });
     } catch (e) {
-      await db.query("ROLLBACK");
-      if (e && e.code === "23505") {
+      if (e && (e.code === "23505" || e.code === "user_already_exists")) {
         return res.status(409).json({ erro: "Usuário já existe." });
       }
       throw e;
