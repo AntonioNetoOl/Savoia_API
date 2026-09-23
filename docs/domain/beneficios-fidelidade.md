@@ -1,6 +1,6 @@
 # Benefícios e brindes de fidelidade
 
-Este documento registra as regras atuais de benefícios e brindes do domínio de sócios.
+Este documento descreve o modelo anterior de benefícios e brindes ainda representado no schema e nas respostas atuais. Em setembro de 2026, foi aprovada a direção de pontuação por mensalidade paga, a ser modelada depois. A regra de 12 mensalidades consecutivas abaixo não deve orientar novas automações. Não houve migração de dados nem alteração dos contratos nesta etapa. Consulte as [regras aprovadas de mensalidades](./socios-fluxos.md#mensalidades-regras-aprovadas-integração-pendente).
 
 ## Conceitos distintos
 
@@ -31,7 +31,7 @@ O percentual de desconto nas lojas é definido pelo plano atual do sócio. A API
 
 ## Brinde de fidelidade
 
-A regra vigente é:
+A regra anterior, ainda representada no catálogo e no runtime, é:
 
 ```text
 12 mensalidades consecutivas pagas

@@ -100,7 +100,7 @@ npm run migrate:member-finance-loyalty
 
 O comando genérico de migration exige o caminho de um arquivo SQL. Os atalhos e rollbacks disponíveis estão documentados em [`migrations/README.md`](migrations/README.md).
 
-## Testes de autenticação e estados associativos
+## Testes de autenticação, estados associativos e calendário
 
 Com Node.js 22 e as dependências do lockfile instaladas (`npm ci`), execute `npm test`.
 O executor nativo testa o middleware e os controllers de login, validação do código de recuperação e redefinição, com JWT e bcrypt reais e dados sintéticos. Não lê `.env`, não envia e-mail e bloqueia conexões PostgreSQL; o driver é simulado. Isso não valida banco, SMTP ou integração HTTP reais.
@@ -109,13 +109,15 @@ Tokens de login existentes, sem `kind`, continuam válidos. Tokens `kind: "pwdre
 
 O mesmo comando executa `test/member-status.test.js`: testa as respostas dos controllers de resumo e menu para ausência de vínculo e todos os estados associativos, independentemente do status da conta e da origem. Verifica também erros de consulta, identificação obrigatória e a recusa de solicitação para vínculo bloqueado. O driver PostgreSQL é simulado; esses testes não comprovam locks, transações ou persistência real da solicitação.
 
+O comando também executa `test/member-billing-calendar.test.js`, com datas explícitas e sem mocks: verifica meses curtos, anos bissextos, tolerância e reativação. Para rodar somente esses cálculos, use `node --test test/member-billing-calendar.test.js`. As funções ainda não são chamadas pelos endpoints nem por tarefas agendadas; não cobram, não enviam avisos e não mudam status. Consulte a [interface do calendário](docs/domain/socios-fluxos.md#interface-do-calendário-implementada).
+
 ## Testes de transações do cadastro
 
 Execute `npm run test:registration` com PostgreSQL 18 instalado. No Windows, os executáveis são procurados em `C:/Program Files/PostgreSQL/18/bin`; para outro caminho, use `npm run test:registration -- "caminho/para/bin"`.
 
 O comando cria e encerra uma instância descartável, com diretório temporário, porta livre em localhost e credenciais efêmeras. Antes de criar tabelas, confere o diretório reportado pelo servidor. Não lê `.env` nem utiliza o banco de desenvolvimento. A estrutura das três tabelas de cadastro em `test/fixtures/registration-schema.sql` foi exportada sem dados do ambiente de desenvolvimento; é uma fixture de teste, não uma migration. A migration core existente é aplicada apenas nessa instância para exercitar o vínculo legado.
 
-Os testes usam PostgreSQL real, inclusive falhas provocadas e concorrência. O pool recicla conexões a cada empréstimo para detectar transações incorretas por `pool.query`; nenhuma query é simulada. SMTP é simulado e logs de cadastro são silenciados para não expor códigos. A instância e seus arquivos são removidos ao terminar. `npm test` executa os testes de JWT e estados associativos, sem precisar iniciar PostgreSQL.
+Os testes usam PostgreSQL real, inclusive falhas provocadas e concorrência. O pool recicla conexões a cada empréstimo para detectar transações incorretas por `pool.query`; nenhuma query é simulada. SMTP é simulado e logs de cadastro são silenciados para não expor códigos. A instância e seus arquivos são removidos ao terminar. `npm test` executa os testes de JWT, estados associativos e calendário, sem precisar iniciar PostgreSQL.
 
 O envio de cadastro confirma sessão e código na mesma transação antes de tentar e-mail. A confirmação grava usuário e consumo de código/sessão na mesma transação; o vínculo legado é tentado após o commit. Falhas de SMTP ou de vínculo legado não desfazem esses commits. Esta correção não muda as políticas de cooldown ou consumo concorrente de OTP.
 
@@ -134,6 +136,8 @@ O `POST /api/member/association-request` cria ou reutiliza o único registro em 
 Detalhes de estados, respostas e fluxos estão em [`docs/domain/socios-fluxos.md`](docs/domain/socios-fluxos.md).
 
 ## Planos atuais
+
+O catálogo abaixo ainda expõe o modelo anterior de fidelidade. A direção aprovada passa a ser pontuação por mensalidade paga, com regras a definir. Vencimentos, tolerância e reativação estão documentados em [regras aprovadas de mensalidades](docs/domain/socios-fluxos.md#mensalidades-regras-aprovadas-integração-pendente); as automações financeiras continuam pendentes.
 
 | Plano | Mensalidade | Desconto nas lojas | Fidelidade |
 |---|---:|---:|---|

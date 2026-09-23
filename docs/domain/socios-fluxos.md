@@ -110,7 +110,49 @@ Quando encontra um registro disponível para o mesmo usuário, o serviço cria o
 
 Para o app, esse resultado continua sendo `socio_inativo`. `legacy_import` identifica a origem do vínculo, não o estado apresentado ao usuário.
 
-## Planos e fidelidade
+## Mensalidades: regras aprovadas, integração pendente
+
+As decisões abaixo foram aprovadas em setembro de 2026. São o contrato para a evolução financeira; não descrevem automações já disponíveis. O endpoint de solicitação continua sem cobrar ou ativar associação.
+
+- A primeira mensalidade confirmada ativa a associação e define o dia original dos vencimentos mensais. Selecionar plano ou retornar da página de pagamento não comprova pagamento.
+- O vencimento é mensal, não a cada 30 dias. Quando o mês não comportar o dia original, usa-se seu último dia; nos meses seguintes retorna-se ao dia original. Exemplo: 31/01/2028 → 29/02/2028 → 31/03/2028 → 30/04/2028.
+- Datas de negócio seguem `America/Sao_Paulo`. O dia do vencimento não conta como atraso. Uma renovação não paga preserva a associação ativa nos sete dias seguintes; a inativação ocorre no início do oitavo dia.
+- Exemplo: vencimento 10/05, lembretes de 11 a 17/05, inativação às 00:00 de 18/05. Pagamento até 17/05 mantém o próximo vencimento em 10/06.
+- Reativação após esse prazo exige somente uma mensalidade, sem quitar meses anteriores, e inicia novo ciclo na data efetiva do pagamento. Isso não autoriza desbloquear vínculo `blocked` nem ignorar restrições da conta.
+- Recorrência é opcional e exige consentimento. Uma tentativa automática recusada permite pagamento manual e segue a mesma tolerância. Cobrança manual e automática devem ser coordenadas para evitar duplicidade.
+- Durante o atraso, enviar no máximo um lembrete no aplicativo e um por e-mail em cada dia de 1 a 7. Interromper após confirmação do pagamento. Notificações e agendamento ainda não estão implementados.
+- Foto poderá ser enviada depois da ativação, pelo fluxo da carteirinha. Troca de plano de sócio ativo fica para outra etapa.
+- Cada mensalidade paga poderá gerar pontuação para brindes; quantidade, expiração, resgate e reversões ainda serão modelados. Não implementar contagem consecutiva ou zeragem como regra nova.
+
+### Interface do calendário implementada
+
+[`src/utils/memberBillingCalendar.js`](../../src/utils/memberBillingCalendar.js) fornece funções puras em CommonJS, sem dependências adicionais. Não está conectado aos endpoints ou a tarefas agendadas e não acessa banco, gateway, relógio ou notificações.
+
+| Função | Entrada | Resultado |
+|---|---|---|
+| `getMonthlyDueDate(anchorDate, monthOffset)` | Data original do ciclo e número inteiro positivo de meses desde essa data | Vencimento ajustado ao mês, preservando o dia original |
+| `getGracePeriod(dueDate)` | Vencimento da renovação | `firstReminderDate`, `lastReminderDate` e `inactiveDate` |
+| `getNextCycle({ anchorDate, dueDate, paymentDate })` | Data original, vencimento pertencente ao ciclo e data efetiva de um pagamento confirmado | `anchorDate`, `nextDueDate` e `restartsCycle` |
+
+Todas as datas são strings `AAAA-MM-DD`, anos 0001–9999, já interpretadas no calendário de `America/Sao_Paulo`. UTC é usado internamente apenas para aritmética de datas, sem depender do fuso da máquina. O chamador futuro deve converter timestamps do provedor para a data local; `inactiveDate` representa o início desse dia local, não meia-noite UTC.
+
+Para a primeira mensalidade, a data de pagamento inicia o ciclo; `getMonthlyDueDate(paymentDate, 1)` fornece o próximo vencimento. Nas renovações, deve-se preservar `anchorDate`, não substituí-la pelo vencimento ajustado de fevereiro. `getNextCycle` recebe o vencimento em aberto que iniciou o atraso, não um vencimento posterior inventado, e reinicia o calendário somente quando o pagamento ocorre a partir de `inactiveDate`.
+
+Entradas inválidas e vencimentos incompatíveis com o ciclo geram `RangeError`. Pagamentos antecipados ainda não foram modelados e são recusados por `getNextCycle`; isso é um limite desta interface, não uma nova proibição no aplicativo. O cálculo não verifica pagamento, autorização, bloqueio ou duplicidade e não executa reativação. Essas verificações pertencem à futura integração; `restartsCycle` indica apenas o resultado de calendário.
+
+Exemplos reproduzíveis em [`test/member-billing-calendar.test.js`](../../test/member-billing-calendar.test.js): vencimento em 10/05/2026, pagamento em 15/05 mantém 10/06; pagamento em 20/05 inicia ciclo com vencimento em 20/06. Notificações e inativação automática permanecem pendentes.
+
+### Segurança e decisões ainda abertas
+
+PagBank é candidato, sem integração ou produto contratado confirmado. A conta informada é PF. Confirmar APIs habilitadas, notificações, consulta de pagamentos e recorrência antes de definir o fluxo; recorrência no débito não está garantida. Ver [restrição da API de recorrência para PF](https://faq.pagbank.com.br/duvida/clientes-pessoa-fisica-pf-podem-integrar-via-api-de-pagamento-recorrente/3417).
+
+A futura integração exige idempotência, autenticação de notificações conforme o provedor, tratamento de eventos duplicados/fora de ordem, reconciliação e confirmação de valor, moeda e mensalidade no servidor. Usar a data efetiva do pagamento confirmada pelo provedor, não a chegada do webhook, para avaliar o prazo. Não armazenar número completo de cartão ou CVV; credenciais e referências sensíveis não podem aparecer em logs.
+
+Ainda é necessário definir estornos/contestações e validar como encerrar tentativas antigas na reativação. Não confundir inativação associativa com cancelamento de cobrança no provedor. Falhas de notificação não devem gerar novas cobranças nem modificar o pagamento.
+
+## Planos e fidelidade: modelo anterior ainda exposto
+
+A tabela abaixo descreve o catálogo e o contrato atuais. A regra de 12 mensalidades consecutivas foi substituída na direção aprovada por pontuação ainda a definir. Schema, dados e textos do aplicativo não foram migrados nesta etapa; não tratar o modelo anterior como especificação para novas automações.
 
 | Plano | Mensalidade | Desconto | Liberação do brinde |
 |---|---:|---:|---|
