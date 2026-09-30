@@ -62,6 +62,33 @@ Retorna uma visão agregada do usuário autenticado, incluindo:
 
 O endpoint consulta dados existentes. Ele não cria cobrança, não processa pagamento e não executa as automações financeiras pendentes.
 
+#### Calendário de uma cobrança registrada
+
+`payments.chargeTiming` informa o calendário da cobrança em aberto com o vencimento mais antigo (`due_at ASC`, desempate por `id_cobranca ASC`). Uma consulta própria considera `scheduled`, `pending` e `failed`, sem o limite de seis registros usado no resumo financeiro anterior. Os campos anteriores de `payments` mantêm sua seleção e significado; podem se referir a outra cobrança.
+
+Exemplo para vencimento em 10/05/2026, consultado em 13/05/2026:
+
+```json
+{
+  "chargeId": "11",
+  "chargeStatus": "pending",
+  "dueDate": "2026-05-10",
+  "asOfDate": "2026-05-13",
+  "timeZone": "America/Sao_Paulo",
+  "daysOverdue": 3,
+  "phase": "grace_period",
+  "firstReminderDate": "2026-05-11",
+  "lastReminderDate": "2026-05-17",
+  "inactiveDate": "2026-05-18"
+}
+```
+
+O vencimento é lido como data civil (`TO_CHAR(due_at, 'YYYY-MM-DD')`), sem conversão do driver para timestamp. `asOfDate` usa o relógio do servidor no fuso informado; o atraso é a diferença de dias de calendário, com mínimo zero. A fase é `not_overdue` antes/no vencimento, `grace_period` nos dias 1–7 e `grace_expired` a partir do início do oitavo dia local.
+
+As três datas da janela são calculadas por `getGracePeriod` conforme a regra aprovada. Não utilizam nem alteram `tolerance_until` armazenado, cujo schema ainda permite outros prazos. `chargeTiming: null` indica que não há cobrança registrada nesses estados; não comprova quitação ou inexistência de obrigação futura. Falhas de consulta e datas inválidas são propagadas como erros, sem calendário fictício.
+
+Esse objeto está vinculado ao ID da cobrança, não ao ciclo atual da associação. Ainda não há identificação de ciclo nem rotina para encerrar tentativas antigas após reativação. Por isso, `grace_expired` pode coexistir com `socio_ativo`; `inactiveDate` é uma data calculada da regra, não uma inativação executada ou uma decisão de elegibilidade. A leitura não muda `memberStatus`, não desbloqueia vínculo, não acumula dívida e não envia notificações. Também não comprova que a cobrança seja uma renovação elegível à manutenção de benefícios durante a tolerância.
+
 ### `GET /api/member/plans`
 
 Lista os planos ativos de `planos_associacao`, ordenados por valor. A resposta inclui código, nome, mensalidade, desconto, regra de fidelidade e descrição do brinde.
@@ -126,7 +153,7 @@ As decisões abaixo foram aprovadas em setembro de 2026. São o contrato para a 
 
 ### Interface do calendário implementada
 
-[`src/utils/memberBillingCalendar.js`](../../src/utils/memberBillingCalendar.js) fornece funções puras em CommonJS, sem dependências adicionais. Não está conectado aos endpoints ou a tarefas agendadas e não acessa banco, gateway, relógio ou notificações.
+[`src/utils/memberBillingCalendar.js`](../../src/utils/memberBillingCalendar.js) fornece funções puras em CommonJS, sem dependências adicionais. O resumo usa `getGracePeriod` para informar o calendário de uma cobrança; as funções não acessam banco, gateway, relógio ou notificações e não executam tarefas agendadas.
 
 | Função | Entrada | Resultado |
 |---|---|---|
@@ -134,7 +161,7 @@ As decisões abaixo foram aprovadas em setembro de 2026. São o contrato para a 
 | `getGracePeriod(dueDate)` | Vencimento da renovação | `firstReminderDate`, `lastReminderDate` e `inactiveDate` |
 | `getNextCycle({ anchorDate, dueDate, paymentDate })` | Data original, vencimento pertencente ao ciclo e data efetiva de um pagamento confirmado | `anchorDate`, `nextDueDate` e `restartsCycle` |
 
-Todas as datas são strings `AAAA-MM-DD`, anos 0001–9999, já interpretadas no calendário de `America/Sao_Paulo`. UTC é usado internamente apenas para aritmética de datas, sem depender do fuso da máquina. O chamador futuro deve converter timestamps do provedor para a data local; `inactiveDate` representa o início desse dia local, não meia-noite UTC.
+Todas as datas são strings `AAAA-MM-DD`, anos 0001–9999, já interpretadas no calendário de `America/Sao_Paulo`. UTC é usado internamente apenas para aritmética de datas, sem depender do fuso da máquina. O resumo lê o vencimento civil e obtém a data de referência em São Paulo; o futuro chamador de pagamentos deve converter timestamps do provedor para a data local. `inactiveDate` representa o início desse dia local, não meia-noite UTC.
 
 Para a primeira mensalidade, a data de pagamento inicia o ciclo; `getMonthlyDueDate(paymentDate, 1)` fornece o próximo vencimento. Nas renovações, deve-se preservar `anchorDate`, não substituí-la pelo vencimento ajustado de fevereiro. `getNextCycle` recebe o vencimento em aberto que iniciou o atraso, não um vencimento posterior inventado, e reinicia o calendário somente quando o pagamento ocorre a partir de `inactiveDate`.
 
