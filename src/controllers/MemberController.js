@@ -1,6 +1,9 @@
 // src/controllers/MemberController.js
 const db = require("../config/DB");
 const getMemberStatus = require("../utils/memberStatus");
+const { getGracePeriod } = require("../utils/memberBillingCalendar");
+
+const BILLING_TIME_ZONE = "America/Sao_Paulo";
 
 function getUserIdFromToken(req) {
   return req.user?.id || req.user?.id_usuario || req.user?.sub || req.usuario?.id || req.usuario?.id_usuario || req.usuario?.sub;
@@ -55,6 +58,21 @@ function getLatestCharge(charges) {
   return charges[0] || null;
 }
 
+function buildChargeTiming(charge) {
+  if (!charge) return null;
+  const dates = getGracePeriod(charge.due_date);
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: BILLING_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date()).map(({ type, value }) => [type, value]));
+  const asOfDate = `${parts.year}-${parts.month}-${parts.day}`;
+  const daysOverdue = Math.max(0, (Date.parse(`${asOfDate}T00:00:00.000Z`) - Date.parse(`${charge.due_date}T00:00:00.000Z`)) / 86400000);
+  return {
+    chargeId: charge.id_cobranca, chargeStatus: charge.status_cobranca, dueDate: charge.due_date,
+    asOfDate, timeZone: BILLING_TIME_ZONE, daysOverdue,
+    phase: daysOverdue === 0 ? "not_overdue" : asOfDate >= dates.inactiveDate ? "grace_expired" : "grace_period", ...dates,
+  };
+}
+
 function getActiveGift(gifts) {
   return gifts.find((gift) => gift.status_brinde === "available") || null;
 }
@@ -94,7 +112,7 @@ function buildAvailablePlanSummary(plan) {
   };
 }
 
-function buildMemberSummary({ user, charges, loyalty, gifts }) {
+function buildMemberSummary({ user, charges, openCharge, loyalty, gifts }) {
   const memberStatus = getMemberStatus(user);
   const statusContent = getStatusContent(memberStatus);
   const isActiveMember = memberStatus === "socio_ativo";
@@ -161,6 +179,7 @@ function buildMemberSummary({ user, charges, loyalty, gifts }) {
       latestStatus: latestCharge?.status_cobranca || null,
       recurrenceEnabled: Boolean(user.id_assinatura && user.status_assinatura === "active"),
       subscriptionStatus: user.status_assinatura || null,
+      chargeTiming: buildChargeTiming(openCharge),
     },
     benefits: {
       title: "Benefícios",
@@ -255,6 +274,22 @@ async function getRecentCharges(socioId) {
   return rows;
 }
 
+async function getOldestOpenCharge(socioId) {
+  if (!socioId) return null;
+  const { rows } = await db.query(
+    `SELECT id_cobranca,
+            status_cobranca,
+            TO_CHAR(due_at, 'YYYY-MM-DD') AS due_date
+       FROM cobrancas
+      WHERE id_socio = $1
+        AND status_cobranca IN ('scheduled', 'pending', 'failed')
+      ORDER BY due_at ASC, id_cobranca ASC
+      LIMIT 1`,
+    [socioId]
+  );
+  return rows[0] || null;
+}
+
 async function getLoyaltySummary(socioId) {
   if (!socioId) {
     return {
@@ -324,13 +359,14 @@ async function getMemberSummary(req, res, next) {
       return res.status(404).json({ erro: "Usuário não encontrado." });
     }
 
-    const [charges, loyalty, gifts] = await Promise.all([
+    const [charges, openCharge, loyalty, gifts] = await Promise.all([
       getRecentCharges(user.id_socio),
+      getOldestOpenCharge(user.id_socio),
       getLoyaltySummary(user.id_socio),
       getAvailableGifts(user.id_socio),
     ]);
 
-    return res.json(buildMemberSummary({ user, charges, loyalty, gifts }));
+    return res.json(buildMemberSummary({ user, charges, openCharge, loyalty, gifts }));
   } catch (error) {
     next(error);
   }

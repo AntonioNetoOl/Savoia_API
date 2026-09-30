@@ -109,7 +109,9 @@ Tokens de login existentes, sem `kind`, continuam válidos. Tokens `kind: "pwdre
 
 O mesmo comando executa `test/member-status.test.js`: testa as respostas dos controllers de resumo e menu para ausência de vínculo e todos os estados associativos, independentemente do status da conta e da origem. Verifica também erros de consulta, identificação obrigatória e a recusa de solicitação para vínculo bloqueado. O driver PostgreSQL é simulado; esses testes não comprovam locks, transações ou persistência real da solicitação.
 
-O comando também executa `test/member-billing-calendar.test.js`, com datas explícitas e sem mocks: verifica meses curtos, anos bissextos, tolerância e reativação. Para rodar somente esses cálculos, use `node --test test/member-billing-calendar.test.js`. As funções ainda não são chamadas pelos endpoints nem por tarefas agendadas; não cobram, não enviam avisos e não mudam status. Consulte a [interface do calendário](docs/domain/socios-fluxos.md#interface-do-calendário-implementada).
+A suíte também verifica `payments.chargeTiming` no resumo: vencimento, dias 1/7/8, meia-noite em São Paulo, virada do ano, ano bissexto, cobrança antiga que falhou, ausência de cobrança e propagação de erros. O relógio é simulado pelo executor nativo (MockTimers), sem dependências novas. A seleção SQL é revisada, mas os testes com driver simulado não comprovam execução no PostgreSQL real. O calendário informa uma cobrança identificada e não altera o estado associativo.
+
+O comando também executa `test/member-billing-calendar.test.js`, com datas explícitas e sem mocks: verifica meses curtos, anos bissextos, tolerância e reativação. Para rodar somente esses cálculos, use `node --test test/member-billing-calendar.test.js`. O endpoint de resumo reutiliza `getGracePeriod`; os cálculos não cobram, não enviam avisos e não mudam status. Consulte a [interface do calendário](docs/domain/socios-fluxos.md#interface-do-calendário-implementada).
 
 ## Testes de transações do cadastro
 
